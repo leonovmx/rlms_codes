@@ -1,0 +1,787 @@
+// cd "C:/Users/Maxim/OneDrive/"
+// cd "C:/Users/Sony/SkyDrive"
+cd "C:/Users/Sony/YandexDisk/IEP"
+// cd "C:/Users/Maxim/YandexDisk/IEP"
+
+clear all
+set more off, perm
+
+global input_path ./rlms/
+global result_file = "${input_path}_res.dta"
+
+local year_start = 1994
+local year_end = 2014
+local round_start = 5
+local letter_start = 97 // ASCII code for letter e
+
+*********************
+***** VAR LIST ******
+*********************
+
+* За основу codebook 21 волны.
+local var_rename _origsm /// 
+_occup /// профессиональна группа
+_int_y /// год опроса
+h5 /// пол
+h6 /// Год рождени респондента 21 ВОЛНА (=qj69.9c)
+_educ /// ОБРАЗОВАНИЕ (ПОДРОБНО): старше 14 лет
+_diplom /// ЗАКОНЧЕННОЕ ОБРАЗОВАНИЕ (ГРУППА)
+j1 /// Ваше основное зантие в настощее врем?
+j90 /// Ваше основное зантие в настощее врем?
+j1_1_1 /// Удовлетворённость
+j1_1_2 ///
+j1_1_3 ///
+j1_1_4 ///
+j1_1_5 /// удовлетворённость работой и жизнью
+_marst /// семейное положение
+j4_1 /// В какой отрасли Вы работаете на этой работе?
+j13_2 /// средне мес зарплата
+j13 ///
+j21_3 ///
+j23 ///
+j73_3y /// стаж
+qj161.1y /// стаж. Сколько полных лет и месцев составлл Ваш официально оформленный общий трудовой стаж до 1 нвар 2002 года, не счита времени учебы на дневном отделении ВУЗа или техникума? ЛЕТ
+qj161.1m /// стаж. Сколько полных лет и месцев составлл Ваш официально оформленный общий трудовой стаж до 1 нвар 2002 года, не счита времени учебы на дневном отделении ВУЗа или техникума? МЕСЯЦЕВ
+qj161.2y /// стаж. Сколько полных лет и месцев составлет Ваш официально оформленный общий трудовой стаж после 1 нвар 2002 года, не счита времени учёбы на дневном отделении вуза или техникума?ЛЕТ
+qj161.2m /// стаж. Сколько полных лет и месцев составлет Ваш официально оформленный общий трудовой стаж после 1 нвар 2002 года, не счита времени учёбы на дневном отделении вуза или техникума?МЕСЯЦЕВ
+h7_2 /// месц проведени интервью 
+j5a ///
+j5b ///
+j6_2 ///
+j10 ///
+j11 ///
+j11_1 ///
+j2code J2CODE j65 /// код профессии
+j32 ///
+j32_1 ///
+j56 ///
+j82 /// Вы обращались куда-нибудь или к кому-нибудь в поисках работы в течение последних 30 дней? 1 - да
+j24 ///
+j25 ///
+j26 ///
+j31 /// fear loosing job
+j81 /// wish to find new job
+j84_2 /// time to find new job
+j21_1_1 /// 
+j21_1_2 /// 
+j21_1_3 /// 
+j21_1_4 /// 
+j21_1_5 /// 
+j21_1_6 ///
+j21_1_7 /// 
+j21_1_8 /// 
+j21_1_9 /// 
+j21_1_10 /// 
+j21_1_11 /// 
+j21_1_12 ///
+j72_17 /// 
+j72_171 /// 
+j72_172 /// 
+j79 /// 
+j322 /// 
+j324 /// 
+j2cod08 /// 
+j5_2 /// 
+j11_2 /// 
+j23 /// 
+j60_5a /// vars from ra
+j62 j63 j64 j66_1 j72_151 j72_18 j81_2 j83_1 j83_3 l5_0 j60_1 /// vars from ra
+j170_1 j170_2 j170_31 j170_32 j170_4 l2_2 l26 /// 
+j29_1 // Вы сменили место работы или профессию по сравнению с ...
+*vars from ra, variable to rename
+
+**********************
+***** DATA LOAD ******
+**********************
+
+local round = `round_start'
+local i = 0
+forvalues year = `year_start' / `year_end' {
+    capture confirm file "${input_path}`year'_`round'round.dta"
+	if _rc==0 {
+	use "${input_path}`year'_`round'round.dta"
+	local letter = char(`letter_start' + `i')
+	local keeplist = ""
+	foreach var in `var_rename' {
+	    capture confirm variable `letter'`var'
+		if !_rc {
+			rename `letter'`var' `var'
+			local keeplist "`keeplist' `var'"
+		}
+		else {
+			di "In year `year' variable `var' is missing"
+		}
+	}
+	gen year = `year'
+	keep idind psu status year `keeplist'
+	if (`year' == `year_start') {
+		save "${result_file}", replace
+	}
+	else {
+		append using "${result_file}"
+		save "${result_file}", replace
+	}
+	// increasing counters
+	local round `++round'
+	local i = `i' + 1
+	}
+}
+
+
+****************
+***** VAR ******
+****************
+
+/* 
+Дл все переменных:
+99999997 ЗАТРУДНЯЮСЬ ОТВЕТИТЬ
+99999998 ОТКАЗ ОТ ОТВЕТА
+99999999 НЕТ ОТВЕТА
+*/
+
+* Leave only representative
+* keep if _origsm == 1
+keep if idind >= 1 & idind != . // there are some problems
+
+* Объединение с файлом дл кореектной работы с индустрми (ОКОНХ и ОКВЭД)
+save "${result_file}", replace
+* Add OKONX data
+merge 1:1 idind year using "${input_path}data_okonx.dta"
+save "${result_file}", replace
+
+* Rename j2code for 2002
+replace j2code=J2CODE if year==2002
+drop J2CODE
+
+*** Демографи *****************************************************************
+** Возраст **
+gen age = year - h6
+label var age "Возраст"
+gen age_sq = age^2
+* There are 15 observations with age = -1, we replace them by zero
+replace age = 0 if age == -1
+
+* Пол. Create dummy variables for males
+gen male = 1 if h5 == 1
+replace male = 0 if h5 == 2
+* gen female = 0
+* replace female=1 if h5==2
+drop h5 // больше она не нужна 
+
+label define male /// назначение лейблов
+1 "муж." ///
+0 "жен." 
+label values male male
+
+*** Социальные *****************************************************************
+** Семейное положение ** 
+* Create dummy variable for married
+gen married = 0
+replace married = . if year == 1994
+replace married = . if (j72_17 == . | j72_17 > 99999990) & (year > 1994 & year < 2009)
+replace married = . if (j322 == . | j322 > 99999990) & year > 2008 & year < 2014
+replace married = 1 if (j72_17 == 2 | j72_17 == 3) & (year > 1994 & year < 2009)
+replace married = 1 if (j322 == 2 | j322 == 3) & year > 2008 & year < 2014
+
+** dummy for presence of children
+// gen child_dummy = 1 if j72_171 == 1
+// replace child_dummy = 0 if j72_171 == 2
+* просто переименовал переменную и удалил про не знаю
+replace j72_171 = 0 if j72_171 == 2 // нет
+replace j72_171 = . if j72_171 >= 3 // дл не знаю, отказавщихс
+rename j72_171 child_dummy
+
+* Number of children
+/* gen child_number = 
+replace child_number=0 if j72_171==2&( year > 2003)
+replace child_number=j72_172 if j72_172<99999990
+*/
+replace j72_172 = j72_172 * child_dummy
+replace j72_172 = . if j72_172 >= 99999990
+rename j72_172 child_number
+
+** Образование
+/*
+в _educ указан уровень образовани, включа незаконченные,
+а в _diplom указана максимальна достигнута ступень,
+котора подверждена документом
+*/
+
+/* 
+Уровни образовани:
+Аспирантура (законченна) 8
+Аспирантура (не законченна) 7
+Высшее 6
+Неполное высшее 5
+Среднее профессиональное 4
+Полное общее (11 классов) 3
+Основное общее (9 классов) 2
+Начальное (3 класса) 1
+Нет начального 0
+*/
+
+gen ed = .
+replace ed = 8 if _educ == 23
+replace ed = 7 if _educ == 22
+replace ed = 6 if _educ == 21
+replace ed = 5 if _educ == 19 | _educ == 20
+replace ed = 4 if _educ == 18 | _educ == 16 | _educ == 11
+replace ed = 3 if _educ == 17 | _educ == 15 | _educ == 14 
+replace ed = 2 if _educ == 9  | _educ == 10 | _educ == 12 | _educ == 13
+replace ed = 1 if _educ >=3 & _educ <9
+replace ed = 0 if _educ == 0  | _educ == 1 | _educ == 2
+
+label define ed ///
+8 "Аспирантура (законченна)" ///
+7 "Аспирантура (не законченна)" ///
+6 "Высшее" ///
+5 "Неполное высшее" /// 
+4 "Среднее профессиональное" ///
+3 "Полное общее (11 классов)" ///
+2 "Основное общее (9 классов)" ///
+1 "Начальное (3 класса)" ///
+0 "Нет начального"
+
+label values ed ed
+label var ed "Уров. образ."
+
+* Dummy for different type education education. 
+gen high_educ = .
+replace high_educ = 0 if _educ < 21
+replace high_educ = 1 if _educ > 20 & _educ < 25
+
+gen sec_educ = 0
+replace sec_educ=1 if _educ == 14
+replace sec_educ=. if _educ > 25
+
+gen prof_educ = 0
+replace prof_educ = 1 if (_educ == 16 | _educ == 18)
+replace prof_educ= .  if _educ > 25
+
+*? Проверить тех, кто имеет незаконченное образование на то, какую максимальную ступень они достигли.
+*? Дамми сравнить с _dimplom.
+
+*** Работа *********************************************************************
+** Наличие работы. **
+* 1 - Вы сейчас работаете (по codebook 21 волны)
+* 2 - Вы находитесь в отпуске декретном или по уходу за ребенком до 3-х лет
+* 3 - Вы находитесь в любом другом оплачиваемом отпуске
+* 4 - Вы находитесь в неоплачиваемом отпуске
+* 5 - Или у Вас сейчас нет работы
+
+gen job = 1 if j1 in 1/4
+replace job = 0 if j1 == 5
+label var job "Наличие работы"
+gen job_male = job * male
+gen job_female = job * !male
+
+* Create dummies for employment/unemployment/workforce
+*?? переписать через job
+*?? удалить j1
+qui gen empl = (j1==1 | j1==2 | j1==3 | j1==4 )
+replace empl = . if j1 == .
+qui gen unempl = (empl == 0 & j82 == 1)
+replace unempl = . if j82 == .
+
+* Dummy for tenure (стаж)
+* Неверно опрелён в случае, если указано с какого года работает на этом предпритии
+* но не указан месц
+// 
+replace h7_2 = . if h7_2 > 99999990 // 
+// С какого года Вы работаете на этом предпритии?
+replace j5a = . if j5a > 99999990 | j5a == 7 | j5a == 8 | j5a == 9 
+// С какого месца Вы работаете на этом предпритии?
+replace j5b = . if j5b > 99999990 | j5b == 7 | j5b == 8 | j5b == 9
+replace j5a = j5a + 1900 if j5a < 100
+gen tenure = ((year - j5a) * 12 + (h7_2 - j5b)) / 12
+gen tenure2 = .
+replace tenure2 = 0 if (h7_2 == 11 | h7_2 == 12) & j5a > year
+replace tenure2 = ((year + 1 - j5a) * 12 + (h7_2 - j5b)) / 12 if tenure < 0
+replace tenure = tenure2 if tenure < 0
+gen tenure_sq = tenure^2
+
+gen tenure_1=(tenure<=1)
+replace tenure_1=. if tenure==.
+gen tenure_3=(tenure>1 & tenure<=3)
+replace tenure_3=. if tenure==.
+gen tenure_5=(tenure>3 & tenure<=5)
+replace tenure_5=. if tenure==.
+gen tenure_10=(tenure>5 & tenure<=10)
+replace tenure_10=. if tenure==.
+gen tenure_11=(tenure>10)
+replace tenure_11=. if tenure==.
+
+* Generate dummy for harmful work
+/* gen harmwork=.
+replace harmwork=0 if j21_3==2 // нет
+replace harmwork=1 if j21_3==1 // да
+*/
+replace j21_3 = 0 if j21_3 == 2
+replace j21_3 = . if j21_3 > 3
+rename j21_3 harmwork
+
+*? wtf?
+
+* Create dummy-variable private. 
+* j23: Явлетс государство владельцем или совладельцем Вашего предприти, организации?
+gen private1 = 1 if j23 == 2 // no
+replace private1 = 0 if j23 == 1 // yes
+
+//Dummy variable for public sector
+gen public = .
+replace public = 1 if j23 == 1
+replace public = 0 if j23 == 2
+
+//Generate dummy for official job
+gen official_job = .
+replace official_job = 1 if j11_1 == 1
+replace official_job = 0 if j11_1 == 2
+
+//Generate dummy for firm size
+gen fsize_small = 0
+replace fsize_small = . if j13 > 99999990
+replace fsize_small = 1 if j13 < 100
+
+gen fsize_med=0
+replace fsize_med=. if j13 > 99999990
+replace fsize_med=1 if j13 > 99 & j13 < 500
+
+gen fsize_large=0
+replace fsize_large = 1 if j13 > 499
+replace fsize_large = . if j13 > 99999990
+
+//Additional job
+gen second_job = 0
+replace second_job = 1 if j32 == 1
+replace second_job = 1 if j32_1 == 1
+
+gen jobloss_fear=.
+replace jobloss_fear=1 if j31==1 | j31==2
+replace jobloss_fear=0 if j31==3 | j31==4 | j31==5
+
+* industries
+replace j4_1=. if j4_1 > 995
+gen industry=.
+replace industry=j4_1 if year>2003
+replace industry=ind2d+100 if year<2004
+
+/*
+Создание одной переменной,
+котора отвечает за отрасль.
+
+Дл тех, кто не менл ни профессию ни работу, что подтверждаетс j29_1 И
+переменной j2code можно брать последнюю отрасль и ставить на предыдущие наблюдени.
+Учесть пробелы в годах.
+
+32 - здравоохранене
+33 - образование
+Раздел 6 в классификаторе профессий можно всех отнести к с/х
+711 - добыча
+712 - строительство
+713 - мастера отделочных строительных работ 
+72 - Рабочие металлургических, машиностроительных и родственных отраслей - промышленность
+Раздел 8 в классификаторе профессий можно разбить на отрасли. 
+*/
+
+* 8240 – оператор машин по резке дерева, производству фурнитуры
+* Всех в этой отрасли можно к древообрабатывающей пром-и, j4_1 = 24
+
+* Данные файла оконх надо свзать с отраслми в j4_1
+
+
+* ?Создавать ли переменные больше 17
+gen ind2 = j4_1
+replace ind2 = 1 if ind2d == 17 | ind2d == 18
+replace ind2 = 4 if ind2d == 13 | ind2d == 85
+replace ind2 = 6 if ind2d == 60
+replace ind2 = 7 if ind2d == 51 | ind2d == 52
+replace ind2 = 8 if ind2d == 20 | ind2d == 29
+replace ind2 = 9 if ind2d == 97
+replace ind2 = 10 if ind2d == 92
+replace ind2 = 11 if ind2d == 95 | ind2d == 93
+replace ind2 = 12 if ind2d == 91 
+replace ind2 = 14 if ind2d == 71 | ind2d == 84 // NB1
+replace ind2 = 15 if ind2d == 96
+replace ind2 = 16 if ind2d == 11
+replace ind2 = 17 if ind2d == 90
+replace ind2 = 23 if ind2d == 13
+replace ind2 = 24 if ind2d == 15 | ind2d == 30
+replace ind2 = 27 if ind2d == 82
+replace ind2 = 996 if inlist(ind2d, 98, 99, 70) // NB2
+
+* Промышленность Машиностроение, ВПК, тжёла промышленность
+replace ind2 = 100 if inlist(ind2, 2, 3, 5) | inlist(ind2d, 12, 14, 16, 19, 81, 87)
+
+/* NB
+---
+NB1. Дл определени того, куда отнести тех, кто работает в отрасли 
+"Обща коммерческа детельность по обеспечению функционировани рынка" 
+(файл okonx, ind2d == 84) при помощи команды ниже нашли тех, 
+кто там работал в 2002 и 2003 и посмотрели, на что чаще всего у  
+них укзаано в 2004 году в переменной j4_1. 
+Такой отраслю оказалась "ТОРГОВЛЯ, БЫТОВОЕ ОБСЛУЖИВАНИЕ" (j4_1 == 14)
+
+browse idind year j4_1 ind2d ind2 if ind2d ==84 & (year == 2003 | year == 2002)
+---
+NB2. Тех, у кого была отрасль ind2d == 98, 99, 70 отмечаны как "Другое" (j4_1 == 996)
+А ind2d == 41 также убран, так как нет такой отрасли в списке. Даже в списке ОКОНХ нет. 
+---
+
+*/
+
+
+/*
+Список отраслей.
+1	Легка, пищева промышленность
+-2	Гражданское машиностроение
+-3	Военно-промышленный комплекс
+4	Нефтегазова промышленность
+-5	Друга отрасль тжелой промышленности
+6	Строительство
+7	Транспорт, свзь
+8	Сельское хозйство
+9	Органы управлени
+10	Образование
+11	Наука, культура
+12	Здравоохранение
+13	Арми, мвд, органы безопасности
+14	Торговл, бытовое обслуживание
+15	Финансы и страхование
+16	Энергетическа промышленность
+17	Жилищно-коммунальное хозйство
+18	Операции с недвижимостью
+20	Социальное обслуживание
+21	Юриспруденци
+22	Церковь
+23	Химическа промышленность
+24	Деревообрабатывающа промышленность, лесное хозйство
+25	Спорт, туризм, развлечени
+26	Услуги населению
+27	It, информационные технологии
+28	Экологи, защита окружающей среды
+29	Организаци общественного питани
+996	Другое
+100 Машиностроение, ВПК, тжёла промышленность (входт 2, 3, 5)
+*/
+
+*? лейблы сохранют первую букву, надо убрать.
+label val ind2 rj4_1
+label define rj4_1 100 "МАШИНОСТРОЕНИЕ, ВПК, ТЯЖЁЛАЯ ПРОМ-ТЬ", add
+
+//Create dummies for education, healthcare, officials etc
+gen military=0
+replace military=1 if j2code==0110
+gen education=0
+replace education=1 if (j2code>2309 & j2code<2410) | (j2code>3309 & j2code<3331)
+gen education_high=0
+replace education_high=1 if (j2code>2309 & j2code<2410) 
+gen teacher_school=0
+replace teacher_school=1 if j2code==2320 | j2code==2331
+gen teacher_university=0
+replace teacher_university=1 if j2code==2310
+gen healthcare=0
+replace healthcare=1 if (j2code>2220 & j2code<2231) | (j2code>3220 & j2code<3241)
+gen healthcare_high=0
+replace healthcare_high=1 if (j2code>2220 & j2code<2231)
+gen official=0
+replace official=1 if (j2code>1109 & j2code<1144) | (j2code>3440 & j2code<3450) | j2code==3439
+gen law=0
+replace law=1 if (j2code>2420 & j2code<2430) | j2code==3432
+gen social_worker=0
+replace social_worker=1 if j2code==2446
+gen art=0
+replace art=1 if (j2code>2450 & j2code<2460) | j2code==3131 | (j2code>3470 & j2code<3476) | (j2code>2430 & j2code<2433) | j2code==4141 
+gen poste=0
+replace poste=1 if j2code==4142
+gen religion=0
+replace religion=1 if j2code==2460 | j2code==3460
+gen police=0
+replace police=1 if (j2code>5160 & j2code<5170) | j2code==3450 ///police, fire; detective
+
+//Create dummy-variable for "budgetnik"
+gen budgetnik = 0
+replace budgetnik = 1 if (j23==1) & (j24!=1 & j25!=1 & j26!=1) & (military==1 | education==1| healthcare==1 | official==1 | law==1 | social_worker==1 | ///
+art==1 | religion==1 | police==1 | j4_1==9 | j4_1==10 | j4_1==11 | j4_1==12 | ind2d==91 | ind2d==92 | ind2d==93 | ind2d==95 | ind2d==97)
+gen budgetnik_old = 0
+replace budgetnik_old = 1 if (j23==1) & (j24!=1 & j25!=1 & j26!=1) & (j4_1==9 | j4_1==10 | j4_1==11 | j4_1==12 | ind2d==91 | ind2d==92 | ind2d==93 | ind2d==95 | ind2d==97)
+replace budgetnik = .  if j23>9990
+replace budgetnik = . if j2code>9990
+replace budgetnik_old = .  if j23>9990
+replace budgetnik = 1 if military==1
+replace budgetnik = 1 if official==1
+replace budgetnik = 1 if social_worker==1
+replace budgetnik = 1 if religion==1
+replace budgetnik = 1 if police==1
+
+replace private1 = 0 if military==1
+replace private1 = 0 if official==1
+replace private1 = 0 if social_worker==1
+replace private1 = 0 if religion==1
+replace private1 = 0 if police==1
+
+//All budgetnik are public
+replace public=1 if budgetnik==1
+
+//Create dummy variable for SOE
+gen soe=0
+replace soe=1 if public==1 & budgetnik==0
+replace soe=. if public==.
+replace soe=. if budgetnik==.
+
+* Sector. 1 - частный, 2 - гос. предприти, 3 - бюджетники
+gen sector = 1 * private1 + 2 * soe + 3 * budgetnik
+label define sec ///
+3 "Бюджетнный" ///
+2 "Гос. предприти" ///
+1 "Частный"
+label values sector sec
+label var sector "Сектор"
+
+* j2code - Кодификатор профессий и специальностей по ISCO-88
+* 4 цифры в коде. 
+* occ1 - содержит первую цифру
+* occ2 - содержит вторую цифру
+* ? нужно ли переводить в char? Военные 0*** - как они учитываютс?
+
+gen occ1 = floor(j2code / 1000)
+gen occ2 = floor(j2code / 100)
+replace occ1 = . if occ1 == 99999
+replace occ2 = . if occ2 == 999999
+
+** WAGE **
+//Drop "000" before 1998
+replace j10 = j10 / 1000 if year < 1998 & j10 < 99999996
+
+//Compute the number of people with wage j10 = 0
+gen j10_0 = .
+replace j10_0 = 0 if j10 > 0 & j10 < 99999990 & job == 1
+replace j10_0 = 1 if j10 == . & job == 1
+
+//Compute the number of people with wage j13_2 = 0
+gen j13_2_0 = .
+replace j13_2_0 = 0 if j13_2 > 0 & j13_2 < 99999990 & job == 1
+replace j13_2_0 = 1 if j13_2 == . & job == 1
+
+//Drop observations with "no answer" (zatrydnyaus otvetit) for wage variables j10, j13_2
+replace j10=. if j10>99999990
+replace j13_2=. if j13_2>99999990
+
+//We drop incredible observations for variable j6_2 "workweek"
+replace j6_2=. if j6_2<2 
+replace j6_2=. if j6_2>168
+gen lengthwork=j6_2
+label var lengthwork "продолжительность рабочей недели"
+
+//Log wage
+gen wage_month = ln(j10)
+label var wage_month "log зарплаты за мес."
+gen wage_an = ln(j13_2)
+label var wage_an "log зарплаты за год"
+
+//Hourly wage
+gen wage_hour=ln(j13_2/(j6_2*4))
+label var wage_hour "log зарплаты за час"
+
+*** Географи ***
+** Федеральные округа
+gen fo = 1 if inlist(psu, 2, 3, 7, 8, 9, 10, 14, 15) //Центр
+replace fo = 2 if inlist(psu, 1, 4, 5, 6) // Северо-западный
+replace fo = 3 if inlist(psu, 19, 20, 21, 22, 23, 24) // Южный
+replace fo = 4 if inlist(psu, 11, 12, 13, 16, 17, 18, 27, 28, 29) // Приволжский
+replace fo = 5 if inlist(psu, 25, 26, 30, 32) // Уральский
+replace fo = 6 if inlist(psu, 31, 33, 34, 35, 37, 39) // Сибирский
+replace fo = 7 if inlist(psu, 36, 38) // Дальневосточный
+label define fo 1 "Центральный" 2 "Северо-западный" 3 "Южный" ///
+4 "Приволжский" 5 "Уральский" 6 "Сибирский" 7 "Дальневосточный"  
+label values fo fo
+
+gen job_sat = 1 if inlist(j1_1_1, 1, 2, 3)
+replace job_sat = 0 if inlist(j1_1_1, 4, 5)
+
+* Gorod selo
+gen city = .
+replace city = 1 if status == 1 | status == 2
+replace city = 0 if status == 3 | status == 4
+
+* Dummy for Moscow region
+gen dummy_Moscow = 0
+replace dummy_Moscow = 1 if  psu == 2 | psu == 3
+
+gen dummy_MSP=0
+replace dummy_MSP=1 if psu==1 | psu==2 | psu==3
+
+//Generate dummies for social benefits
+
+foreach num of numlist 1/9 {
+	gen bonus_`num'=.
+	replace bonus_`num'=0 if j21_1_`num'==2
+	replace bonus_`num'=1 if j21_1_`num'==1
+}
+
+* Create dummies for 
+* i year - years, 
+* i._educ - education, 
+* i.psu - regions,
+* i.fo - федеральные округа
+* i.ed - education (образование по новой переменной)
+* i.j4_1 - industries. According to their answear
+* i._occup - профессиональна группа
+* i.occ1 - професси, перва цифра кода профессии
+* i.occ2 - професси, первые две цифра кода профессии
+
+xi i.year i._educ i.psu i.fo i.ed i.j4_1 i._occup i.ind2 i.occ1 i.occ2
+
+
+/*
+Исправлени:
+если определена хот бы одна переменна типа бюджетник, то остальные 
+должны быть равна 0.
+*/
+
+replace soe = 0 if (private1 == 1 | budgetnik == 1) & soe == .
+replace budgetnik = 0 if (private1 == 1 | soe == 1) & budgetnik == .
+replace private1 = 0 if (soe == 1 | budgetnik == 1) & private1 == .
+* обновление показател сектора
+replace sector = 1 * private1 + 2 * soe + 3 * budgetnik
+
+****************
+***** END ******
+****************
+
+**************************
+***** SECTOR CHANGE ******
+**************************
+
+
+* 1) бюджетник в private или soe
+* 2) из прайват или сое в бюджет 
+
+* ?удалить регрессию.
+xtset idind year // можно использовать _int_y
+by idind: gen budg_private = 1 if (private1 == 1 | soe == 1) & (l1.budgetnik == 1)
+by idind: replace budg_private = 0 if ((private1 == l1.private1 & private1 != .) | (soe == l1.soe & soe != .) | ///
+	(private1 == l1.soe & private1 != .) | (l1.private1 == soe & private1 != .) | (budgetnik == l1.budgetnik & budgetnik != .)) & budg_private != 1
+
+by idind: gen private_budg = 1 if (l1.private1 == 1 | l1.soe == 1) & (budgetnik == 1)
+by idind: replace private_budg = 0 if ((private1 == l1.private1 & private1 != .) | (soe == l1.soe & soe != .) | ///
+	(private1 == l1.soe & private1 != .) | (l1.private1 == soe & private1 != .) | (budgetnik == l1.budgetnik & budgetnik != .)) & private_budg != 1
+
+table j29_1 budg_private private_budg
+//browse year idind j29_1  budgetnik private1 soe private_budg budg_private sector  if j29_1 == 1 & ((private_budg == 0 & budg_private == 1) | (private_budg == 1 & budg_private == 0))
+
+* Find people with another sector
+//browse year idind j1 j4_1 j29_1  budgetnik private1 soe private_budg budg_private sector if idind == 9
+
+* test is var that eq 1 if previous and future sector value is eq but not eq to current
+by idind: gen test = 1 if sector != l1.sector & ///
+	sector != f1.sector & ///
+	f1.sector == l1.sector & ///
+	l1.sector != . & ///
+	sector != . 
+
+* the same just for budgetnik
+by idind: gen test2 = 1 if budgetnik != l1.budgetnik & ///
+	budgetnik != f1.budgetnik & ///
+	f1.budgetnik == l1.budgetnik & ///
+	l1.budgetnik != . & ///
+	budgetnik != . 
+	
+* Problematic idind
+//browse idind year psu _educ j1 h6 j2code j2cod08 j4_1 j29_1 sector if test == 1 & (private_budg == 1 | budg_private == 1) 
+//browse idind year psu _educ j1 h6 j2code j2cod08 j4_1 j29_1 sector if test == 1 & (private_budg == 1 | budg_private == 1) & year > 2005
+
+* To look at one of problematic idind
+//browse year idind j1 j4_1 j23 j24 j25 j26 j29_1  budgetnik private1 soe private_budg budg_private sector if idind == 9
+	
+	
+// Transition between sectors
+/*
+sort idind year
+by idind: gen budg_private = 1 if private1[_n] == 1 & budgetnik[_n-1] == 1
+by idind: replace budg_private = 0 if private1[_n] == private1[_n-1]
+
+by idind: gen private_budg = 1 if budgetnik[_n] == 1 & private1[_n-1] == 1
+by idind: replace private_budg = 0 if private1[_n] == private1[_n-1]
+by idind: replace private_budg = . if private1[_n] == .
+by idind: replace private_budg = . if private1[_n-1] == .
+
+by idind: gen private_public = 1 if private1[_n] == 1 
+*/
+
+label data "Last compiled $S_DATE $S_TIME"
+save "${result_file}", replace
+
+****************
+***** MISC *****
+****************
+
+/*
+* Отрасль в базе сменилась, а респондент указал, что ничего не менл.
+browse idind year j1 j4_1 ind2d ind2 j29_1 if  ///
+	(j29_1 == 1 | j29_1 == 2) & ///
+	ind2 != l1.ind2 & ///
+	l1.ind2 != .
+
+tabulate ind2 year if  ///
+	(j29_1 == 1 | j29_1 == 2) & ///
+	ind2 != l1.ind2 & ///
+	l1.ind2 != . & ind2 != . , ///
+	matcell(freq) matrow(rnames) matcol(cnames)
+putexcel B3 = matrix(freq) using ./rlms/temp, sheet("1") replace
+local rows = rowsof(rnames)
+local row = 3
+local cum_percent = 0
+
+forvalues i = 1/`rows' {
+ 
+        local val = rnames[`i',1]
+        local val_lab : label (ed) `val'
+ 
+        putexcel A`row'=("`val_lab'") using educ, sheet("ed year") modify
+        local row = `row' + 1
+}
+putexcel B2 = matrix(cnames) using educ, sheet("ed year") modify colwise
+
+misstable sum ind2
+
+browse idind year j1 j4_1 ind2d ind2 j2code j29_1 if idind == 7
+
+* Отрасль d t-1 и в t+1 совпадают, а в t ина.
+tabulate ind2 year if ///
+	f1.ind2 == l1.ind2 & ///
+	ind2 != l1.ind2 & ///
+	l1.ind2 != . & ind2 != . , ///
+	matcell(freq) matrow(rows) matcol(cols)
+putexcel B3 = matrix(freq) using ./rlms/temp, sheet("") replace
+local rows = rowsof(rnames)
+local row = 3
+local cum_percent = 0
+
+forvalues i = 1/`rows' {
+ 
+        local val = rnames[`i',1]
+        local val_lab : label (ed) `val'
+ 
+        putexcel A`row'=("`val_lab'") using educ, sheet("ed year") modify
+        local row = `row' + 1
+}
+
+putexcel B2 = matrix(cnames) using educ, sheet("ed year") modify colwise
+
+* Отрасль d t-1 и в t+1 совпадают, а в t ина и при этом отвечают, что ничего не менли.
+tabulate ind2 year if ///
+	f1.ind2 == l1.ind2 & ///
+	ind2 != l1.ind2 & ///
+	l1.ind2 != . & ind2 != . & ///
+	(j29_1 == 1 | j29_1 == 2)
+*/
+
+/*
+sort idind year
+egen kol = count(year), by(idind)
+keep if kol != 1
+by idind: gen q = 1 if ind2 != ind2[_n - 1]
+collapse (sum) q (count) year, by(idind)
+gen f = q/year
+hist f
+*/
