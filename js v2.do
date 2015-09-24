@@ -2,6 +2,7 @@
 Описание. 
 
 	Отличается от v1 иным представленем
+	Надо ещё лейблы добавить к дамми переменным. Как?
 
 Что тут делается. 
 1. Данные берутся из /rlms/_res.dta
@@ -117,22 +118,24 @@ global n6 = "All"
 
 estimates clear
 global sec = "budgetnik soe public" // сектора
-global vars "male married age age_sq j6_2 high_educ tenure tenure_sq fsize_small fsize_med city dummy_Moscow _Ifo_*" // переменные для пула
-global pnl_vars " married age age_sq j6_2 high_educ tenure tenure_sq fsize_small fsize_med city dummy_Moscow" // переменные для панели
+global vars "male married age age_sq j6_2 high_educ tenure tenure_sq fsize_small fsize_med city dummy_Moscow _Iyear* _Ifo_* " // переменные для пула
+global pnl_vars " married age age_sq j6_2 high_educ tenure tenure_sq fsize_small fsize_med city dummy_Moscow _Iyear*" // переменные для панели
 
-global spec1 "_Iyear*"
-global spec2 "_Iyear* _Iind2* _Iocc1*"
-global spec3 "_Iyear* _Iind2* _Iocc2*"
-global spec4 "_Iyear* _Iocc1*"
-global spec5 "_Iyear* _Iocc2*"
-global spec6 "_Iyear* _Iind2*"
+global spec1 ""
+global spec2 "_Iind2* _Iocc1*"
+global spec3 "_Iind2* _Iocc2*"
+global spec4 "_Iocc1*"
+global spec5 "_Iocc2*"
+global spec6 "_Iind2*"
 * В спецификацию 8 перемножаем отрасль и бюджетника
 foreach x of varlist _Iind2* {
 	gen x_`x' = budgetnik * `x'
 }
-global spec7 "_Iyear* x_*"
-global spec8 "_Iyear* x_* _Iind2*"
+global spec7 "x_*"
+global spec8 "x_* _Iind2*"
 
+* i - спецификация, spec1 - spec8
+* j - тип, n1 - n6
 forvalues i = 1/8 {
 * di "***** SPECIFICATION `i' *****"
 
@@ -168,6 +171,9 @@ forvalues i = 1/8 {
 			local s = "budgetnik soe"
 			local c = 1
 		}
+
+		local vv = "" // коэффициенты, которые будут выводиться. budg, soe, pub
+
 		foreach k in "" "xt"  { // panel or not?
 			if "`k'" != "xt" {
 				local opt = "vce(cl idind)"
@@ -179,55 +185,79 @@ forvalues i = 1/8 {
 				di "***** PANEL *****"
 			}
 		
-		*** WAGE ***	
-		
-		di _n	
-		di "***** SPECIFICATION `i' *****"
-		di "***** ${n`j'} *****"
-		di "***** PANEL *****"
-		di "***** WAGE *****"
-		di _n	
-		
-		cap `k'reg wage_hour ///
-		${`v'vars} ///
-		${spec`i'} ///
-		`s' ///
-		if `c' , ///
-		`opt'
-		
-		if _rc == 0 {
-			est sto `i'_`j'_`k'
-		}
-		
-		*** SAT ***
-		di _n	
-		di "***** SPECIFICATION `i' *****"
-		di "***** ${n`j'} *****"
-		di "***** PANEL *****"
-		di "***** SAT *****"
-		di _n	
-		
-		cap `k'probit sat ///
-		${`v'vars} ///
-		${spec`i'} ///
-		`s' ///
-		if `c' , ///
-		`opt'
+************** WAGE ************************************************************
+			di _n	
+			di "***** SPECIFICATION `i' *****"
+			di "***** ${n`j'} *****"
+			di "***** PANEL *****"
+			di "***** WAGE *****"
+			di "Start: $S_DATE $S_TIME"
+			di _n	
 			
-		*** nj1_1_1 ***
-		di _n	
-		di "***** SPECIFICATION `i' *****"
-		di "***** ${n`j'} *****"
-		di "***** PANEL *****"
-		di "****** NJ1_1_1 *****"
-		di _n	
-		
-		cap `k'oprobit nj1_1_1 ///
-		${`v'vars} ///
-		${spec`i'} ///
-		`s' ///
-		if `c' , ///
-		`opt'
+			cap `k'reg wage_hour ///
+				${`v'vars} ///
+				${spec`i'} ///
+				`s' ///
+				if `c' , ///
+				`opt'
+			
+			if _rc == 0 {
+				est sto w_s`i'_t`j'_`k'
+				local t2 = "`t2' s`i'_t`j'_`k'"
+			}		
+************** SAT *************************************************************
+			di _n	
+			di "***** SPECIFICATION `i' *****"
+			di "***** ${n`j'} *****"
+			di "***** PANEL *****"
+			di "***** SAT *****"
+			di "Start: $S_DATE $S_TIME"
+			di _n	
+			
+			cap `k'probit sat ///
+				${`v'vars} ///
+				${spec`i'} ///
+				`s' ///
+				if `c' , ///
+				`opt'
+			
+			if _rc == 0 {
+				est sto s_s`i'_t`j'_`k'
+				local t2 = "`t2' s_s`i'_t`j'_`k'"
+			}
+************** nj1_1_1 *********************************************************
+			di _n	
+			di "***** SPECIFICATION `i' *****"
+			di "***** ${n`j'} *****"
+			di "***** PANEL *****"
+			di "****** NJ1_1_1 *****"
+			di "Start: $S_DATE $S_TIME"
+			di _n	
+			
+			cap `k'oprobit nj1_1_1 ///
+				${`v'vars} ///
+				${spec`i'} ///
+				`s' ///
+				if `c' , ///
+				`opt'
+			if _rc == 0 {
+				est sto n_s`i'_t`j'_`k'
+				local t2 = "`t2' n_s`i'_t`j'_`k'"
+			}			
 		}
+
+***** Удаляем ненужные переменныеиз списка переменных
+* Надо оставить только по индустрии? По профессии?
+/* Можно при помощи этого кода.
+		unab not : _Iind2_12 
+		unab all : _Iind2* 
+		local all : list all - not 
+		di "`all'"
+*/
+***** Таблицы для одной спец-ии и одного типа (табл 2) *************************
+		esttab `t2', keep("`s' ${spec`i'}") ///
+			title("Specification `j'. `n1'. POOL & WAGE") ///
+			r2 ci
+		estimates clear
 	}
 }
