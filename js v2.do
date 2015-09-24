@@ -188,13 +188,17 @@ forvalues i = 1/8 {
 		di "***** WAGE *****"
 		di _n	
 		
-		`k'reg wage_hour ///
-			${`v'vars} ///
-			${spec`i'} ///
-			`s' ///
-			if `c' , ///
-			`opt'
-	
+		cap `k'reg wage_hour ///
+		${`v'vars} ///
+		${spec`i'} ///
+		`s' ///
+		if `c' , ///
+		`opt'
+		
+		if _rc == 0 {
+			est sto `i'_`j'_`k'
+		}
+		
 		*** SAT ***
 		di _n	
 		di "***** SPECIFICATION `i' *****"
@@ -203,12 +207,12 @@ forvalues i = 1/8 {
 		di "***** SAT *****"
 		di _n	
 		
-			`k'probit sat ///
-			${`v'vars} ///
-			${spec`i'} ///
-			`s' ///
-			if `c' , ///
-			`opt'
+		cap `k'probit sat ///
+		${`v'vars} ///
+		${spec`i'} ///
+		`s' ///
+		if `c' , ///
+		`opt'
 			
 		*** nj1_1_1 ***
 		di _n	
@@ -218,12 +222,12 @@ forvalues i = 1/8 {
 		di "****** NJ1_1_1 *****"
 		di _n	
 		
-			`k'oprobit nj1_1_1 ///
-			${`v'vars} ///
-			${spec`i'} ///
-			`s' ///
-			if `c' , ///
-			`opt'
+		cap `k'oprobit nj1_1_1 ///
+		${`v'vars} ///
+		${spec`i'} ///
+		`s' ///
+		if `c' , ///
+		`opt'
 		}
 	}
 }
